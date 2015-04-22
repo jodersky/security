@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+
+./makecard "$1" | inkscape --export-area-page --export-pdf=/dev/stdout -f /dev/stdin

@@ -1,0 +1,78 @@
+#!/bin/bash -e
+
+# configuration variables (change at will)
+CONFIG="/etc/ssl/openssl.cnf"
+CERT_SUFFIX=".cert.pem"
+KEY_SUFFIX=".key.pem"
+REQ_SUFFIX=".req.pem"
+
+# global variables set through parameters
+CA=${CA:-root}
+CA_CERT="${CA}${CERT_SUFFIX}"
+CA_KEY="${CA}${KEY_SUFFIX}"
+CA_SERIAL="${CA}.srl"
+
+# print usage
+print_usage() {
+    cat <<- EOF
+    uca - a certificate authority of micro complexity
+    
+    uca setup
+    uca issue cert
+
+    Environment Variables:
+    CA name of certificate authority
+EOF
+}
+
+# generate new certificate authority
+new_ca() {
+    local ca_req="${CA}${REQ_SUFFIX}"
+
+    openssl genpkey -algorithm RSA -out "$CA_KEY" -pkeyopt rsa_keygen_bits:4096 #-aes-256-cbc
+    openssl req -new -key "$CA_KEY" -out "$ca_req"
+    openssl x509 -req -in "$ca_req" -extfile "$CONFIG" -extensions v3_ca -days 3650 -signkey "$CA_KEY" -out "$CA_CERT"
+
+    echo "01" > "$CA_SERIAL"
+
+    rm -f "$reqfile"
+}
+
+# issue new certificate
+# $1 name of new certificate
+issue() {
+    local keyfile="${1}${KEY_SUFFIX}"
+    local reqfile="${1}${REQ_SUFFIX}"
+    local certfile="${1}${CERT_SUFFIX}"
+
+    echo $certfile
+
+    openssl genpkey -algorithm RSA -out "$keyfile" -pkeyopt rsa_keygen_bits:4096
+    openssl req -new -key "$keyfile" -out "$reqfile"
+    openssl x509 -req -in "$reqfile" -extfile "$CONFIG" -extensions usr_cert -CA "$CA_CERT" -CAkey "$CA_KEY" -CAserial "$CA_SERIAL" -out "$certfile"
+
+    rm -f "$reqfile"
+}
+
+
+case "$1" in
+    setup)
+        new_ca
+        exit 0
+        ;;
+
+    issue)
+        if [ -e "$CA_CERT" ] && [ -e "$CA_KEY" ]; then
+            echo $2
+            issue $2
+            exit 0
+        else 
+            echo "no root certificate and key found"
+            exit 1
+        fi
+        ;;
+
+    *)
+        print_usage
+        exit 0
+esac

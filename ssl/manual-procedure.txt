@@ -1,0 +1,25 @@
+Root certificate
+================
+
+1) generate private key
+openssl genpkey -algorithm RSA -out root.key.pem -pkeyopt rsa_keygen_bits:4096 -aes-256-cbc
+
+2) create root certificate signing request
+openssl req -new -key root.key.pem -out root.req.pem
+
+3) self-sign root certificate request
+openssl x509 -req -in root.req.pem -extfile openssl.cnf -extensions v3_ca -days 3650 -signkey root.key.pem -out root.cert.pem
+        
+
+Server certificate
+==================
+
+1) generate private key, same procedure as root
+
+2) create certificate signing request
+openssl req -new -key server.key.pem -out server.req.pem
+
+3) sign certificate
+openssl x509 -req -in server.req.pem -extfile openssl.cnf -extensions v3_usr -CA root.cert.pem -CAkey root.key.pem -CAcreateserial
+
+
