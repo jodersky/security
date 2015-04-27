@@ -1,12 +1,7 @@
 package com.github.jodersky.skeybase
-package verification
+package verifiers
 
 import scala.concurrent.Future
-
-import Verifier.extractSignedStatement
-import Verifier.finalHost
-import Verifier.verifyStatement
-import Verifier.withRedirects
 import akka.actor.ActorSystem
 import openpgp.Backend
 import spray.client.pipelining.Get
@@ -46,15 +41,21 @@ class GitHubVerifier(backend: Backend) extends Verifier {
         throw new NoSuchElementException("No gist found.")
       }
     }
-    val gistPipeline = withRedirects(sendReceive) ~> finalHost("api.github.com").tupled ~> unmarshal[Seq[Gist]] ~> urlOfHeadGist
+    val gistPipeline = withRedirects(sendReceive) ~> finalHost("api.github.com") ~> unmarshal[Seq[Gist]] ~> urlOfHeadGist
     val rawPipeline = sendReceive ~> unmarshal[String]
 
+    val githubService = Service(
+      name = Some("github"),
+      username = Some(proof.nametag),
+      hostname = None,
+      domain = None)
+
     for (
-      rawUrl <- gistPipeline(Get("https://api.github.com/users/" + proof.nametag + "/gists"));
-      content <- rawPipeline(Get(rawUrl));
-      signed <- extractSignedStatement(content);
-      clear <- backend.verifySignature(signed, fingerprint);
-      verified <- verifyStatement(clear, "github", proof.nametag)
+      rawUrl <- gistPipeline(Get("https://api.github.com/users/" + proof.nametag + "/gists")); // url of raw gist
+      content <- rawPipeline(Get(rawUrl)); // content of raw gist
+      signed <- extractSignedMessage(content); // signed statement of ownership
+      clear <- backend.verifySignature(signed, fingerprint); // verified against fingerprint
+      verified <- verifyOwnershipStatement(clear, githubService) // verified statement
     ) yield {
       proof
     }

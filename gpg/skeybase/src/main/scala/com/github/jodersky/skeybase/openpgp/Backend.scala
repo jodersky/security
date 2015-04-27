@@ -9,8 +9,8 @@ trait Backend {
   def importKey(key: String): Unit
 
   /**
-   * verifies a signed statement.
-   * @param signed the statement to verify
+   * Verifies a signed message.
+   * @param signed the message to verify
    * @param fingerprint the fingerprint of the key that allegedly signed this statement
    */
   def verifySignature(signed: String, fingerprint: String): Try[String]

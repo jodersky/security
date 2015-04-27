@@ -7,8 +7,7 @@ import scala.language.implicitConversions
 import scala.util.Success
 import scala.util.Failure
 import openpgp.GnuPG
-import verification.GitHubVerifier
-import verification.VerificationException
+import verifiers._
 
 object Main {
 
@@ -16,12 +15,12 @@ object Main {
     implicit val system = ActorSystem()
     import system.dispatcher
 
-    val verifier = new GitHubVerifier(new GnuPG())
+    val verifier = new WebsiteFileVerifier(new GnuPG()) //new GitHubVerifier(new GnuPG())
 
     val proofs = for (
-      user <- Keybase.origin.lookup("jodersky");
-      github = user.proofs.find(_.proofType == "github").get;
-      verification <- verifier.verify(user.key.fingerprint, github)
+      user <- new Keybase().lookup("jodersky");
+      github = user.proofs.find(_.proofType == "generic_web_site").get;
+      verification <- verifier.verify(user.primaryKey.fingerprint, github)
     ) yield {
       verification
     }
@@ -29,7 +28,7 @@ object Main {
     proofs onComplete { result =>
       result match {
         case Success(proof) => println("done")
-        case Failure(err: VerificationException) => println("Verification exception! Someone may be doing something nasty.") 
+        case Failure(err: VerificationException) => println("Verification exception! Someone may be doing something evil. " + err.getMessage) 
         case Failure(err) => err.printStackTrace()
       }
       system.shutdown()

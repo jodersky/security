@@ -1,12 +1,7 @@
 package com.github.jodersky.skeybase
-package verification
+package verifiers
 
 import scala.concurrent.Future
-
-
-import Verifier.extractSignedStatement
-import Verifier.finalHost
-import Verifier.verifyStatement
 import Verifier.withRedirects
 import akka.actor.ActorSystem
 import openpgp.Backend
@@ -24,12 +19,19 @@ class WebsiteFileVerifier(backend: Backend) extends Verifier {
   def verify(fingerprint: String, proof: Proof)(implicit sys: ActorSystem) = {
     import sys.dispatcher
 
-    val pipeline = withRedirects(sendReceive) ~> finalHost(proof.nametag).tupled ~> unmarshal[String]
+    val pipeline = withRedirects(sendReceive) ~> finalHost(proof.nametag) ~> unmarshal[String]
+
+    val service = Service(
+      name = None,
+      username = None,
+      hostname = Some(proof.nametag),
+      domain = None)
+
     for (
       content <- pipeline(Get(proof.proofUrl));
-      signed <- extractSignedStatement(content);
+      signed <- extractSignedMessage(content);
       clear <- backend.verifySignature(signed, fingerprint);
-      verified <- verifyStatement(clear, "github", proof.nametag)
+      verified <- verifyOwnershipStatement(clear, service)
     ) yield {
       proof
     }

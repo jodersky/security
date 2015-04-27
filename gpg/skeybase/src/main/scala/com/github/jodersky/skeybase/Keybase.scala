@@ -17,7 +17,9 @@ import spray.json.JsValue
 import spray.json.RootJsonFormat
 
 object Keybase {
-  def origin = new Keybase("https://keybase.io")
+  
+  //private JSON responses
+  protected case class LookupResponse(them: Seq[User])
 
   object JsonProtocol extends DefaultJsonProtocol {
     implicit val basicsFormat = jsonFormat1(Basics.apply)
@@ -45,16 +47,23 @@ object Keybase {
   }
 }
 
-class Keybase(host: String) {
-
+/**
+ * Keybase.io API entry point.
+ * @param host the internet host implementing the Keybase API, defaults to "https://keybase.io"
+ */
+class Keybase(host: String = "https://keybase.io") {
+  import Keybase._
   import Keybase.JsonProtocol._
+  
+  private val entry = host + "/_/api/1.0/"
 
+  /** Retrieves a user from keybase */
   def lookup(username: String)(implicit system: ActorSystem): Future[User] = {
     import system.dispatcher
 
-    val lookup = sendReceive ~> unmarshal[LookupResponse]
-    val url = host + "/_/api/1.0/user/lookup.json?usernames=" + username + "&fields=proofs_summary,public_keys"
+    val url = entry + "user/lookup.json?usernames=" + username + "&fields=proofs_summary,public_keys"
 
+    val lookup = sendReceive ~> unmarshal[LookupResponse]
     lookup(Get(url)).map(_.them.head)
   }
 
